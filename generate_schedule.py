@@ -7,7 +7,7 @@ Generates a schedule for a given month.
 import argparse
 import random
 
-from schedule_automation import parse_input, generate_day_list, construct_and_optimize
+from scheduling_automation import parse_input, generate_day_list, construct_and_optimize
 
 # Parse the command line arguments
 
