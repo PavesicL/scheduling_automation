@@ -8,7 +8,7 @@ from .days import Day
 from .worker import Worker, ALL_WORKPLACES
 
 
-def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], workplace_weights : list[int], penalty_weight : int) -> None:
+def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], workplace_weights : list[int], penalty_weekend_package : int, penalty_equal_distribution : int) -> None:
     """
     Defines the model used for optimization, and optimizes it.
 
@@ -19,9 +19,12 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
     - The worker can be assigned at most one shift per day.
     - After working NZV or PORODNA, the worker gets the next day off.
 
-    Soft constraints (enforced by a pentaly):
+    Soft constraints (enforced by a penalty):
     - A worker can request a 'weekend_package': to be assigned to any combination
       of PORODNA or NZV or a Friday, and the next Sunday.
+    - Each worker should be equally distributed among the workplaces he works at.
+      For each workplace, we check where they are assigned the most times, and where
+      they are assigned the least. Then, we minimize this imbalance for each worker.
 
     The model is optimized by minimizing the difference between the smallest and
     largest amount of work assigned. This aims to equally distribute the workload.
@@ -29,8 +32,7 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
     work.
     The assignment to different workplaces is weighed differently. The weights are passed
     though the workplace_weights argument. Must be integers!
-
-    Additionally, we minimize the soft constraint penalties, multiplied by the penalty_weight parameter.
+    The soft constraints are added into the objective function with a penalty prefactor.
 
     Arguments:
         worker_list : list[Worker]
@@ -40,8 +42,10 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
         workplace_weights : list[int]
             The weights assigned to each workplace when optimizing the
             schedule. Must match the alphabetical order of workplaces in ALL_WORKPLACES.
-        penalty_weight : int
-            The weight to multiply the soft constraint penalties with.
+        penalty_weekend_package : int
+            The weight penalising the assignment of the weekend package.
+        penalty_equal_distribution : int
+            The weight penalising the imbalanced distribution of a worker across workplaces.
 
     Returns:
         CpModel
@@ -108,7 +112,7 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
     fridays = [ ii for ii, day in enumerate(day_list) if day.isoweekday() == 5 ]
 
     assigned_weekends = []
-    penalties = []
+    weekend_penalties = []
     # Enforce at most one weekend package per worker
     for ww, worker in enumerate(worker_list):
         and_vars = []
@@ -140,7 +144,50 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
         model.AddBoolAnd([var.Not() for var in and_vars]).OnlyEnforceIf(assigned_weekend_package.Not())
 
         # Add penalty * weight to the objective to soften weekend package assignment
-        penalties.append(assigned_weekend_package * worker.weekend_package * (-1) )
+        weekend_penalties.append(assigned_weekend_package * worker.weekend_package * (-1) )
+
+    # Collect the total penalty
+    total_weekend_penalty = model.NewIntVar(-num_workers, num_workers, 'total_penalty')
+    model.Add(total_weekend_penalty == sum(weekend_penalties))
+
+    ####################################################################################################################################
+    # Soft constraint for a balanced assignment across workplaces.
+
+    imbalance_penalties = []
+
+    total_work_site = {}
+    max_work_site = []
+    min_work_site = []
+    imbalances = []
+    for ww, worker in enumerate(worker_list):
+        works = []
+
+        # Iterate over the workplaces each worker works at and collect the number of times
+        # he is assigned to each.
+        for pp in range(num_workplaces):
+            if ALL_WORKPLACES[pp] in worker.workplaces:
+                total = model.NewIntVar(0, num_days, f'total_work_site_{ww}_{pp}')
+                model.Add(total == sum(work[ww, dd, pp] for dd in range(num_days)))
+                total_work_site[ww, pp] = total
+                works.append(total)
+
+        # max_pp and min_pp encode max(works) and min(works) respectively.
+        # These is the biggest and smallest number of assignments for each worker.
+        max_pp = model.NewIntVar(0, num_days, f'max_work_site_{ww}')
+        min_pp = model.NewIntVar(0, num_days, f'min_work_site_{ww}')
+        model.AddMaxEquality(max_pp, works)
+        model.AddMinEquality(min_pp, works)
+        max_work_site.append(max_pp)
+        min_work_site.append(min_pp)
+
+        # imb is the imbalance: the difference between the min and max
+        imb = model.NewIntVar(0, num_days, f'imbalance_{ww}')
+        model.Add(imb == max_pp - min_pp)
+        imbalances.append(imb)
+
+    # Collect the total penalty across all workers
+    total_imbalance = model.NewIntVar(0, num_workers * num_days, 'total_imbalance')
+    model.Add(total_imbalance == sum(imbalances))
 
     ####################################################################################################################################
 
@@ -160,24 +207,14 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
     model.AddMaxEquality(max_work, total_work)
     model.AddMinEquality(min_work, total_work)
 
-
-    # Also add the penalties
-    total_penalty = model.NewIntVar(-num_workers, num_workers, 'total_penalty')
-    model.Add(total_penalty == sum(penalties))
-
-
     # Objective function:
-    #model.Minimize( (total_penalty * 100000000000))
-    model.Minimize((max_work - min_work) + (total_penalty * penalty_weight))
-
+    model.Minimize((max_work - min_work) + (total_weekend_penalty * penalty_weekend_package) + (total_imbalance * penalty_equal_distribution))
 
     # Solve model
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
 
-
     # Write the output.
-
     schedule_array = []
     if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         for dd, day in enumerate(day_list):
@@ -206,6 +243,11 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
         worker : sum( solver.Value(work[ww, dd, pp]) for dd in range(num_days) for pp in range(num_workplaces) )
         for ww, worker in enumerate(worker_list)
     }
+    number_of_shifts_per_workplace = {
+        (worker, ALL_WORKPLACES[pp]) : sum( solver.Value(work[ww, dd, pp]) for dd in range(num_days))
+        for pp in range(num_workplaces)
+        for ww, worker in enumerate(worker_list)
+    }
     number_of_weighted_shifts = {
         worker : sum( workplace_weights[pp] * solver.Value(work[ww, dd, pp]) for dd in range(num_days) for pp in range(num_workplaces) )
         for ww, worker in enumerate(worker_list)
@@ -220,8 +262,15 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
 
     print(f"The worker with the largest number of shifts is {max_shifts_worker} with {max_shifts}.")
     print(f"The worker with the smallest number of shifts is {min_shifts_worker} with {min_shifts}.")
-    print(f"The worker with the largest workload is {max_weighted_shifts_worker} with {max_weighted_shifts}.")
-    print(f"The worker with the smallest workload is {min_weighted_shifts_worker} with {min_weighted_shifts}.")
+    print(f"The worker with the largest workload is {max_weighted_shifts_worker} with {max_weighted_shifts}. " +
+          f"They get: {[ str(val) + 'x ' + key[1] for  key, val in number_of_shifts_per_workplace.items() if key[0] == max_weighted_shifts_worker]}")
+    print(f"The worker with the smallest workload is {min_weighted_shifts_worker} with {min_weighted_shifts}. " +
+          f"They get: {[ str(val) + 'x ' + key[1] for  key, val in number_of_shifts_per_workplace.items() if key[0] == min_weighted_shifts_worker]}")
+
+
+    print("###########################")
+    print(f"The total imbalance is {solver.Value(total_imbalance)}.")
+    print(f"All imbalances are: {[solver.Value(imbalances[ww]) for ww in range(num_workers) ]}")
 
     print(f"The weekend packages were assigned to: {', '.join(assigned_weekend_packages)}.")
 
@@ -233,7 +282,6 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         for row in schedule_array:
             wr.writerow(row)
-
 
     ########################################################################
 

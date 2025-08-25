@@ -21,7 +21,8 @@ parser.add_argument('POPS_weight', type=int)
 parser.add_argument('PORODNA_weight', type=int)
 parser.add_argument('TX_weight', type=int)
 
-parser.add_argument('weekend_weight', type=int)
+parser.add_argument('penalty_weekend_package', type=int)
+parser.add_argument('penalty_equal_distribution', type=int)
 args = parser.parse_args()
 
 # These are the weights used in the optimization
@@ -40,7 +41,8 @@ random.shuffle(worker_list)
 construct_and_optimize(worker_list=worker_list,
                        day_list=day_list,
                        workplace_weights=workplace_weights,
-                       penalty_weight=args.weekend_weight
+                       penalty_weekend_package=args.penalty_weekend_package,
+                       penalty_equal_distribution=args.penalty_equal_distribution
                        )
 
 print("DONE")
