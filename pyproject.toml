@@ -1,0 +1,4 @@
+[project]
+name = "scheduling_automation"
+version = "0.0.1"
+dependencies = ["ortools", "holidays"]
