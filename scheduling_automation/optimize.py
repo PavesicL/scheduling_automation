@@ -109,7 +109,9 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
 
     ####################################################################################################################################
     # Weekend package soft assignment: assign worker to work Fri and Sun (nzv or porodna) up to once per month
-    fridays = [ ii for ii, day in enumerate(day_list) if day.isoweekday() == 5 ]
+
+    # All Fridays where the ensuing Sunday is included in the month.
+    fridays = [ ii for ii, day in enumerate(day_list) if day.isoweekday() == 5 and ii + 2 < len(day_list) ]
 
     assigned_weekends = []
     weekend_penalties = []
