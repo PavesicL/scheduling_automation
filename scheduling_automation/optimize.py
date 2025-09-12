@@ -100,11 +100,11 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
             else:
                 model.Add( sum( work[ww, dd, pp] for pp in range(num_workplaces) ) == 0 )
 
-    # Constraint: After working NZV or PORODNA, next day off
+    # Constraint: After working NZV or PORODNA or POPS, next day off
     for ww in range(num_workers):
         for dd in range(num_days - 1):
-            # If work porodna or nzv on day dd then no work on day dd+1
-            model.Add(work[ww, dd, nzv_index] + work[ww, dd, porodna_index] + sum(work[ww, dd+1, pp] for pp in range(num_workplaces)) <= 1)
+            # If work porodna or nzv or pops on day dd then no work on day dd+1
+            model.Add(work[ww, dd, nzv_index] + work[ww, dd, porodna_index] + work[ww, dd, pops_index] + sum(work[ww, dd+1, pp] for pp in range(num_workplaces)) <= 1)
 
 
     ####################################################################################################################################
