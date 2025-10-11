@@ -52,10 +52,8 @@ def parse_input(filename : str):
             surname = row[1]
             name = row[2]
             workplaces = row[3]
-            work_dates = row[4:-4]
-            weekend_package = row[-4]
-            weekend_12h = row[-3] # this is irrelevant and ignored
-            current_workplace = row[-2] # this is irrelevant and ignored
+            work_dates = row[4:-2]
+            weekend_package = row[-2]
             special_requests = row[-1]
 
             worker = Worker(name=name, surname=surname)

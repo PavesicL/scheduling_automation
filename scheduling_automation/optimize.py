@@ -231,7 +231,7 @@ def construct_and_optimize(worker_list : list[Worker], day_list : list[Day], wor
                         break
 
                     elif solver.Value(work[ww, dd, pp]) == 1:
-                        schedule_array[dd].append(worker_list[ww])
+                        schedule_array[dd].append(worker_list[ww].surname.upper())
 
         # Add the workplaces as the header
         schedule_array.insert(0, ALL_WORKPLACES.copy())
