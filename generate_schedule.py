@@ -24,7 +24,7 @@ parser.add_argument('TX_weight', type=int)
 parser.add_argument('penalty_weekend_package', type=int)
 parser.add_argument('penalty_equal_distribution', type=int)
 
-parser.add_argument('--next_month_days', type=int, default=0)
+parser.add_argument('next_month_days', type=int)
 
 args = parser.parse_args()
 
