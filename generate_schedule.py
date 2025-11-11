@@ -39,8 +39,8 @@ print("Generating the schedule for:")
 print(day_list)
 
 # Check that the number of days matches the schedule requests.
-if any( len(w.work_dates) != len(day_list) for w in worker_list ):
-    raise Exception(f"The number of work dates does not match the calendar!\n We have {len(day_list)} days, but got {(len(w.work_dates) for w in worker_list)}.")
+if any( [len(w.work_dates) != len(day_list) for w in worker_list] ):
+    raise Exception(f"The number of work dates does not match the calendar!\n We have {len(day_list)} days, but got {[len(w.work_dates) for w in worker_list]}.")
 
 # Because the optimization is so under-determined, the initial conditions make a big difference.
 # These are basically determined by the order in which you loop over the workers.
