@@ -23,14 +23,24 @@ parser.add_argument('TX_weight', type=int)
 
 parser.add_argument('penalty_weekend_package', type=int)
 parser.add_argument('penalty_equal_distribution', type=int)
+
+parser.add_argument('--next_month_days', type=int, default=0)
+
 args = parser.parse_args()
 
 # These are the weights used in the optimization
 workplace_weights = [args.NZV_weight, args.POPS_weight, args.PORODNA_weight, args.TX_weight]
 
 # Parse the data from the .tsv file and generate the list of workers and days
-day_list = generate_day_list(month=args.month, year=args.year)
+day_list = generate_day_list(month=args.month, year=args.year, next_month_days=args.next_month_days)
 worker_list = parse_input(filename=args.input_file_name)
+
+print("Generating the schedule for:")
+print(day_list)
+
+# Check that the number of days matches the schedule requests.
+if any( len(w.work_dates) != len(day_list) for w in worker_list ):
+    raise Exception(f"The number of work dates does not match the calendar!\n We have {len(day_list)} days, but got {len(w.work_dates) for w in worker_list}.")
 
 # Because the optimization is so under-determined, the initial conditions make a big difference.
 # These are basically determined by the order in which you loop over the workers.
