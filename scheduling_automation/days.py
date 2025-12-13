@@ -3,7 +3,7 @@ Contains functions used to generate a list of days of the month,
 and a class that adds new functionality to datetime.date.
 """
 
-from datetime import date
+from datetime import date, timedelta
 import calendar
 import holidays
 
@@ -55,33 +55,21 @@ class Day(date):
         return f"{self.day}.{month_str}"
 
 
-def generate_day_list(month : int, year : int, next_month_days : int) -> list[Day]:
+def generate_day_list(start_date : date, end_date : date) -> list[Day]:
     """
-    Generates the list of days in a month.
+    Generates the list of days between the start and end dates.
 
     Arguments:
-        month : int
-            Which month (1-12) the list is for.
-        year : int
-            Which year the list is for.
-        next_month_days : int
-            Sometimes the schedule should include a few
-            days of the next month as well (like New Year's).
-            We append this many days of the next month to the day_list.
-
+        start_date : date
+            The starting date.
+        end_date : date
+            The end date. Is included in the interval.
     Returns:
         list[Day]
         A list of Day objects for the given month.
     """
 
-    num_days = calendar.monthrange(year, month)[1]
-    day_list = [ Day(year, month, ii + 1) for ii in range(num_days) ]
-
-    if next_month_days > 0:
-        # append the next month
-        next_month = (month + 1)%12
-        next_year = year + 1 if month == 12 else year
-
-        day_list += [ Day(next_year, next_month, ii + 1) for ii in range(next_month_days) ]
+    all_dates = [start_date + timedelta(days=ii) for ii in range((end_date - start_date).days + 1)]
+    day_list = [ Day(dd.year, dd.month, dd.day) for dd in all_dates ]
 
     return day_list
