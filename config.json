@@ -1,0 +1,14 @@
+{
+
+"start_date"	: "2026-01-04",
+"end_date"	: "2026-01-31",
+
+"NZV_weight"	: 10,
+"POPS_weight"	: 10,
+"PORODNA_weight": 10,
+"TX_weight"	: 10,
+
+"penalty_weekend_package"	: 10,
+"penalty_equal_distribution"	: 10
+
+}
