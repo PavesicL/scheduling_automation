@@ -1,4 +1,4 @@
 [project]
 name = "scheduling_automation"
 version = "0.1.0"
-dependencies = ["ortools", "holidays", "pyyaml"]
+dependencies = ["ortools", "holidays"]
